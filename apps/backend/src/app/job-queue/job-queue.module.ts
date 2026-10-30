@@ -2,6 +2,7 @@ import { Module, Type, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JobQueueClientModule } from './job-queue-client.module';
 import { TestPersonCodingProcessor } from './processors/test-person-coding.processor';
+import { McpPilotProcessor } from './processors/mcp-pilot.processor';
 import { CodingStatisticsProcessor } from './processors/coding-statistics.processor';
 import { ExportJobProcessor } from './processors/export-job.processor';
 import { FlatResponseFilterOptionsProcessor } from './processors/flat-response-filter-options.processor';
@@ -23,6 +24,7 @@ import { ResponseEntity } from '../database/entities/response.entity';
 import { ValidationTask } from '../database/entities/validation-task.entity';
 
 const processorProviders = {
+  'mcp-pilot': McpPilotProcessor,
   'test-person-coding': TestPersonCodingProcessor,
   'coding-statistics': CodingStatisticsProcessor,
   'data-export': ExportJobProcessor,

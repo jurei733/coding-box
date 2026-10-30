@@ -4,6 +4,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { DataSource } from 'typeorm';
 import * as https from 'https';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { catchError, firstValueFrom } from 'rxjs';
 import { Person, Response, Log } from '../shared';
 
@@ -42,6 +43,13 @@ export { Result };
 const agent = new https.Agent({
   rejectUnauthorized: false
 });
+const strictAgent = new https.Agent({ rejectUnauthorized: true });
+const strictTransport = new AsyncLocalStorage<boolean>();
+
+/** New pilot calls use verified TLS and never forward credentials through redirects. */
+export function withStrictTestcenterTransport<T>(action: () => Promise<T>): Promise<T> {
+  return strictTransport.run(true, action);
+}
 const TESTCENTER_REQUEST_TIMEOUT_MS = 120000;
 
 type ServerFilesResponse = {
@@ -68,6 +76,15 @@ type File = {
 @Injectable()
 export class TestcenterService {
   private readonly logger = new Logger(TestcenterService.name);
+
+  private requestTransport() {
+    return strictTransport.getStore() ? {
+      httpsAgent: strictAgent,
+      maxRedirects: 0,
+      timeout: TESTCENTER_REQUEST_TIMEOUT_MS,
+      maxContentLength: 32 * 1024 * 1024
+    } : { httpsAgent: agent };
+  }
 
   constructor(
     private readonly personService: PersonService,
@@ -105,7 +122,7 @@ export class TestcenterService {
               password: credentials.password
             },
             {
-              httpsAgent: agent
+              ...this.requestTransport()
             }
           )
           .pipe(
@@ -151,7 +168,7 @@ export class TestcenterService {
           `${url}/api/workspace/${tc_workspace}/results` :
           `https://iqb-testcenter${server}.de/api/workspace/${tc_workspace}/results`,
         {
-          httpsAgent: agent,
+          ...this.requestTransport(),
           headers: headersRequest
         }
       );
@@ -385,7 +402,7 @@ export class TestcenterService {
             let rawResponses: Response[] = [];
             try {
               const response = await this.httpService.axiosRef.get<Response[]>(endpoint, {
-                httpsAgent: agent,
+                ...this.requestTransport(),
                 timeout: TESTCENTER_REQUEST_TIMEOUT_MS,
                 headers: headersRequest
               });
@@ -511,7 +528,7 @@ export class TestcenterService {
         const { data: logData } = await this.httpService.axiosRef.get<Log[]>(
           logsUrl,
           {
-            httpsAgent: agent,
+            ...this.requestTransport(),
             timeout: TESTCENTER_REQUEST_TIMEOUT_MS,
             headers: headersRequest
           }
@@ -765,7 +782,7 @@ export class TestcenterService {
         await this.httpService.axiosRef.get<ServerFilesResponse>(
           filesEndpoint,
           {
-            httpsAgent: agent,
+            ...this.requestTransport(),
             headers: headersRequest
           }
         );
@@ -1544,7 +1561,7 @@ export class TestcenterService {
 
     try {
       const response = await this.httpService.axiosRef.get<File>(requestUrl, {
-        httpsAgent: agent,
+        ...this.requestTransport(),
         headers: headersRequest
       });
 

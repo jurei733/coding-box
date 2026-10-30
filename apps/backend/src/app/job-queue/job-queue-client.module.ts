@@ -54,6 +54,11 @@ import { ValidationTask } from '../database/entities/validation-task.entity';
     }),
     BullModule.registerQueue({
       name: 'database-export'
+    }),
+    BullModule.registerQueue({
+      name: 'mcp-pilot',
+      settings: { maxStalledCount: 0 },
+      defaultJobOptions: { attempts: 1, removeOnComplete: false, removeOnFail: false }
     })
   ],
   providers: [JobQueueService],

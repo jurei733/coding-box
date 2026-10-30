@@ -1,7 +1,9 @@
 import {
   Injectable,
   Logger,
-  ConflictException
+  ConflictException,
+  Optional,
+  ServiceUnavailableException
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -46,6 +48,12 @@ export interface TestPersonCodingJobData {
   freshnessVersion?: 'v1' | 'v3';
   freshnessStates?: ('PENDING' | 'STALE')[];
   freshnessSourceRevision?: number;
+}
+
+export interface McpPilotJobData {
+  operationId: string;
+  workspaceId: number;
+  actorId: number;
 }
 
 export interface FlatResponseFilterOptionsJobData {
@@ -250,7 +258,8 @@ export class JobQueueService {
     @InjectQueue('external-coding-import') private externalCodingImportQueue: Queue,
     @InjectQueue('database-export') private databaseExportQueue: Queue<DatabaseExportJobData>,
     @InjectRepository(ValidationTask)
-    private readonly validationTaskRepository: Repository<ValidationTask>
+    private readonly validationTaskRepository: Repository<ValidationTask>,
+    @Optional() @InjectQueue('mcp-pilot') private readonly mcpPilotQueue?: Queue<McpPilotJobData>
   ) { }
 
   private getQueue(name: string): Queue {
@@ -270,7 +279,8 @@ export class JobQueueService {
       ['response-analysis', this.responseAnalysisQueue],
       ['variable-analysis', this.variableAnalysisQueue],
       ['external-coding-import', this.externalCodingImportQueue],
-      ['database-export', this.databaseExportQueue]
+      ['database-export', this.databaseExportQueue],
+      ...(this.mcpPilotQueue ? [['mcp-pilot', this.mcpPilotQueue] as [string, Queue]] : [])
     ]);
   }
 
@@ -640,6 +650,18 @@ export class JobQueueService {
       Boolean
     );
     return jobs.find(job => job.data && matchFn(job.data));
+  }
+
+  async addMcpPilotJob(data: McpPilotJobData): Promise<Job<McpPilotJobData>> {
+    if (!this.mcpPilotQueue) throw new ServiceUnavailableException('MCP pilot queue unavailable.');
+    return this.mcpPilotQueue.add(data, {
+      jobId: data.operationId, attempts: 1, removeOnComplete: false, removeOnFail: false
+    });
+  }
+
+  async getMcpPilotJob(id: string): Promise<Job<McpPilotJobData> | null> {
+    if (!this.mcpPilotQueue) throw new ServiceUnavailableException('MCP pilot queue unavailable.');
+    return this.mcpPilotQueue.getJob(id);
   }
 
   async addTestPersonCodingJob(

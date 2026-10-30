@@ -4,6 +4,9 @@ import { HttpModule } from '@nestjs/axios';
 import { JwtService } from '@nestjs/jwt';
 import { DERIVED_VARIABLE_READER } from '../database/services/workspace/derived-variable-reader.token';
 import Workspace from '../database/entities/workspace.entity';
+import { McpPilotOperation } from '../database/entities/mcp-pilot-operation.entity';
+import { McpPilotConfigService } from '../database/services/jobs/mcp-pilot-config.service';
+import { McpPilotOperationService } from '../database/services/jobs/mcp-pilot-operation.service';
 import WorkspaceAdmin from '../database/entities/workspace-admin.entity';
 import FileUpload from '../database/entities/file_upload.entity';
 import WorkspaceUser from '../database/entities/workspace_user.entity';
@@ -97,6 +100,7 @@ import { CodingModule } from '../coding/coding.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      McpPilotOperation,
       Workspace,
       WorkspaceAdmin,
       FileUpload,
@@ -136,6 +140,8 @@ import { CodingModule } from '../coding/coding.module';
     forwardRef(() => CodingModule)
   ],
   providers: [
+    McpPilotConfigService,
+    McpPilotOperationService,
     { provide: DERIVED_VARIABLE_READER, useExisting: WorkspaceFilesService },
     WorkspaceCoreService,
     WorkspaceFilesService,
@@ -184,6 +190,7 @@ import { CodingModule } from '../coding/coding.module';
     WorkspaceExclusionService
   ],
   exports: [
+    McpPilotOperationService,
     DERIVED_VARIABLE_READER,
     forwardRef(() => CodingModule),
     WorkspaceCoreService,

@@ -42,6 +42,9 @@ import { CodingJob } from '../database/entities/coding-job.entity';
 import { CodingJobCoder } from '../database/entities/coding-job-coder.entity';
 import { JournalEntry } from '../database/entities/journal-entry.entity';
 import { UsersService } from '../database/services/users/users.service';
+import { McpPilotOperationService } from '../database/services/jobs/mcp-pilot-operation.service';
+import { WorkspaceMcpPilotController } from '../admin/workspace/workspace-mcp-pilot.controller';
+import { McpPilotProcessor } from '../job-queue/processors/mcp-pilot.processor';
 
 const sharedCodingProviders = [
   CodingJobService,
@@ -77,7 +80,7 @@ async function createApplication(): Promise<TestingModule> {
   const queues = [
     'test-person-coding', 'coding-statistics', 'data-export', 'flat-response-filter-options',
     'test-results-upload', 'codebook-generation', 'reset-coding-version', 'validation-task',
-    'response-analysis', 'variable-analysis', 'external-coding-import', 'database-export'
+    'response-analysis', 'variable-analysis', 'external-coding-import', 'database-export', 'mcp-pilot'
   ];
   queues.forEach(name => builder.overrideProvider(getQueueToken(name)).useValue({}));
 
@@ -106,6 +109,9 @@ describe('CodingModule', () => {
 
     const module = await createApplication();
     try {
+      expect(module.get(McpPilotOperationService)).toBeInstanceOf(McpPilotOperationService);
+      expect(module.get(WorkspaceMcpPilotController)).toBeInstanceOf(WorkspaceMcpPilotController);
+      expect(module.get(McpPilotProcessor)).toBeInstanceOf(McpPilotProcessor);
       const settings = module.select(WorkspaceSettingsModule).get(WorkspaceSettingsService, { strict: true });
       expect((module.get(WorkspaceSettingsController) as unknown as { settings: WorkspaceSettingsService }).settings).toBe(settings);
       expect((module.get(WorkspaceFilesController) as unknown as { workspaceSettings: WorkspaceSettingsService }).workspaceSettings).toBe(settings);

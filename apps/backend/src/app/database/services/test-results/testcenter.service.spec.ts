@@ -6,7 +6,7 @@ import { DataSource, Repository } from 'typeorm';
 import { of, throwError } from 'rxjs';
 import { TestGroupsInfoDto } from '../../../../../../../api-dto/files/test-groups-info.dto';
 import { ImportOptionsDto } from '../../../../../../../api-dto/files/import-options.dto';
-import { TestcenterService } from './testcenter.service';
+import { TestcenterService, withStrictTestcenterTransport } from './testcenter.service';
 import { PersonService } from './person.service';
 import { WorkspaceFilesService } from '../workspace/workspace-files.service';
 import { Person, Response, Log } from '../shared';
@@ -28,6 +28,26 @@ describe('TestCenterService', () => {
   let codingAnalysisService: DeepMocked<CodingAnalysisService>;
   let connection: DataSource;
   let importRunRepository: DeepMocked<Repository<TestcenterImportRun>>;
+
+  it('isolates verified TLS and redirect rejection to the new pilot import context', async () => {
+    httpService.axiosRef.get.mockResolvedValue({ data: {} });
+    const file = {
+      name: 'player.html', size: 1, modificationTime: 0, type: 'Resource', id: 'p', report: [] as [], info: { label: '', description: '' }, data: ''
+    };
+    await Promise.all([
+      withStrictTestcenterTransport(async () => {
+        await new Promise(resolve => { setImmediate(resolve); });
+        await service.getFile(file, '1', '42', 'strict-token', 'https://strict.example.org');
+      }),
+      service.getFile(file, '1', '42', 'legacy-token', 'https://legacy.example.org')
+    ]);
+    const strict = httpService.axiosRef.get.mock.calls.find(([url]) => url.startsWith('https://strict.'))![1];
+    const legacy = httpService.axiosRef.get.mock.calls.find(([url]) => url.startsWith('https://legacy.'))![1];
+    expect(strict.httpsAgent.options.rejectUnauthorized).toBe(true);
+    expect(strict.maxRedirects).toBe(0);
+    expect(legacy.httpsAgent.options.rejectUnauthorized).toBe(false);
+    expect(legacy.maxRedirects).toBeUndefined();
+  });
 
   beforeEach(async () => {
     const runs = new Map<string, TestcenterImportRun>();

@@ -9,6 +9,7 @@ import { AuthModule } from '../../auth/auth.module';
 import { JobQueueModule } from '../../job-queue/job-queue.module';
 import { CacheModule } from '../../cache/cache.module';
 import { WorkspaceCodingController } from '../workspace/workspace-coding.controller';
+import { WorkspaceMcpPilotController } from '../workspace/workspace-mcp-pilot.controller';
 import { WorkspaceCodingExportController } from '../workspace/workspace-coding-export.controller';
 import { WorkspaceCodingJobController } from '../workspace/workspace-coding-job.controller';
 import { WorkspaceCodingStatisticsController } from '../workspace/workspace-coding-statistics.controller';
@@ -39,6 +40,7 @@ import { DistributionPreviewLimiterService } from './distribution-preview-limite
     TypeOrmModule.forFeature([Setting])
   ],
   controllers: [
+    WorkspaceMcpPilotController,
     WorkspaceCodingController,
     WorkspaceCodingExportController,
     WorkspaceCodingJobController,

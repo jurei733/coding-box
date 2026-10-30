@@ -44,6 +44,7 @@ import { TestPersonCodingJob } from './entities/test-person-coding-job.entity';
 import { SystemNotification } from './entities/system-notification.entity';
 import { DoubleCodingReviewDecision } from './entities/double-coding-review-decision.entity';
 import { TestcenterImportRun } from './entities/testcenter-import-run.entity';
+import { McpPilotOperation } from './entities/mcp-pilot-operation.entity';
 import { RuntimeConfigModule } from '../config/runtime-config.module';
 import {
   RuntimeConfigService,
@@ -136,7 +137,8 @@ export function buildPostgresConnectionOptions(
           TestPersonCodingJob,
           SystemNotification,
           DoubleCodingReviewDecision,
-          TestcenterImportRun
+          TestcenterImportRun,
+          McpPilotOperation
         ],
         synchronize: false,
         extra: {
