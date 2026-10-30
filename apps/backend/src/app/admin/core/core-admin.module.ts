@@ -24,6 +24,8 @@ import { CodingJobsController } from '../coding-jobs/coding-jobs.controller';
 import { DatabaseAdminController } from '../database/database-admin.controller';
 import { DatabaseExportProcessor } from '../database/database-export.processor';
 import { DatabaseExportService } from '../database/database-export.service';
+import { DatabaseImportService } from '../database/database-import.service';
+import { DatabaseImportController } from '../database/database-import.controller';
 import { Setting } from '../../database/entities/setting.entity';
 import FileUpload from '../../database/entities/file_upload.entity';
 import { ContentPoolSettingsController } from '../content-pool/content-pool-settings.controller';
@@ -79,6 +81,7 @@ export function getEnabledCoreAdminProcessors(
     VariableBundleController,
     CodingJobsController,
     DatabaseAdminController,
+    DatabaseImportController,
     ContentPoolSettingsController,
     LegalNoticeController,
     PublicSystemNotificationController,
@@ -88,6 +91,7 @@ export function getEnabledCoreAdminProcessors(
     LogoService,
     LogoUploadInterceptor,
     DatabaseExportService,
+    DatabaseImportService,
     ...getEnabledCoreAdminProcessors(),
     ContentPoolIntegrationService,
     LegalNoticeService,

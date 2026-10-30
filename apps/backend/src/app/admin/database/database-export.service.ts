@@ -520,7 +520,7 @@ export class DatabaseExportService {
     return Math.min(99, Math.max(1, (processedTables / totalTables) * 99));
   }
 
-  private getWorkspaceExportTables(): WorkspaceExportTable[] {
+  getWorkspaceExportTables(): WorkspaceExportTable[] {
     return [
       {
         name: 'workspace',
@@ -529,6 +529,10 @@ export class DatabaseExportService {
       {
         name: 'persons',
         query: 'SELECT * FROM persons WHERE workspace_id = $1'
+      },
+      {
+        name: 'file_upload',
+        query: 'SELECT * FROM file_upload WHERE workspace_id = $1'
       },
       {
         name: 'booklet',
