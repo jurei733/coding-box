@@ -1,4 +1,6 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import {
+  ConflictException, Injectable, Logger, Optional
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Brackets,
@@ -8,6 +10,7 @@ import {
   Repository,
   SelectQueryBuilder
 } from 'typeorm';
+import { assertManualJobRevision } from './manual-job-snapshot.util';
 import { JournalService } from '../shared/journal.service';
 import { statusStringToNumber } from '../../utils/response-status-converter';
 import { ResponseEntity } from '../../entities/response.entity';
@@ -40,6 +43,7 @@ import {
 export interface ApplyCodingResultsOptions {
   overwriteExisting?: boolean;
   actorUserId?: number;
+  expectedRevision?: string;
 }
 
 export interface ApplyCodingResultsResult {
@@ -491,7 +495,8 @@ export class CodingResultsService {
             const freshnessBlocker = await this.getFreshnessApplyBlockerInTransaction(
               workspaceId,
               codingJobId,
-              queryRunner.manager
+              queryRunner.manager,
+              options.expectedRevision
             );
             if (freshnessBlocker) {
               await queryRunner.rollbackTransaction();
@@ -516,6 +521,7 @@ export class CodingResultsService {
           } catch (error) {
             await queryRunner.rollbackTransaction();
             this.logger.error(`Error finalizing coding results: ${error.message}`, error.stack);
+            if (error instanceof ConflictException) throw error;
             throw new Error(`Fehler beim Anwenden der Kodierungsergebnisse: ${error.message}`);
           } finally {
             await queryRunner.release();
@@ -544,7 +550,8 @@ export class CodingResultsService {
         const freshnessBlocker = await this.getFreshnessApplyBlockerInTransaction(
           workspaceId,
           codingJobId,
-          queryRunner.manager
+          queryRunner.manager,
+          options.expectedRevision
         );
         if (freshnessBlocker) {
           await queryRunner.rollbackTransaction();
@@ -643,12 +650,14 @@ export class CodingResultsService {
       } catch (error) {
         await queryRunner.rollbackTransaction();
         this.logger.error(`Error updating responses: ${error.message}`, error.stack);
+        if (error instanceof ConflictException) throw error;
         throw new Error(`Fehler beim Anwenden der Kodierungsergebnisse: ${error.message}`);
       } finally {
         await queryRunner.release();
       }
     } catch (error) {
       this.logger.error(`Error applying coding results: ${error.message}`, error.stack);
+      if (error instanceof ConflictException) throw error;
       throw new Error(`Fehler beim Anwenden der Kodierungsergebnisse: ${error.message}`);
     }
   }
@@ -695,7 +704,8 @@ export class CodingResultsService {
   private async getFreshnessApplyBlockerInTransaction(
     workspaceId: number,
     codingJobId: number,
-    manager: EntityManager
+    manager: EntityManager,
+    expectedRevision?: string
   ): Promise<ApplyCodingResultsResult | null> {
     await lockWorkspaceTestResultsMutationInTransaction(manager, workspaceId);
     const codingJob = await this.codingJobService.getCodingJobByIdForWorkspace(
@@ -703,6 +713,7 @@ export class CodingResultsService {
       workspaceId,
       manager
     );
+    await assertManualJobRevision(codingJob, manager, expectedRevision);
     return this.getFreshnessApplyBlocker(codingJob);
   }
 

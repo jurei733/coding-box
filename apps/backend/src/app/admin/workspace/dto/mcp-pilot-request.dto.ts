@@ -1,7 +1,6 @@
 /* eslint-disable max-classes-per-file */
 import {
-  ArrayMaxSize, ArrayMinSize, ArrayUnique, Equals, IsArray, IsBoolean, IsDefined,
-  IsInt, IsObject, IsString, Matches, MaxLength, Min, ValidateIf, ValidateNested
+  ArrayMaxSize, ArrayMinSize, ArrayUnique, Equals, IsArray, IsBoolean, IsDefined, IsInt, IsIn, IsObject, IsOptional, IsString, Matches, MaxLength, Min, ValidateIf, ValidateNested
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -45,6 +44,16 @@ export class McpImportOptionsDto {
 }
 
 export class StartMcpTestcenterImportDto {
+  @ApiPropertyOptional({ type: [String], description: 'Only these exact source filenames are imported; other studies in the same Testcenter workspace remain outside the import.' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(200, { each: true })
+  source_file_names?: string[];
+
   @ApiProperty({ example: 'pilot-testcenter' })
   @IsString()
   @Matches(/^[A-Za-z0-9_-]{1,64}$/)
@@ -81,12 +90,19 @@ export class StartMcpTestcenterImportDto {
 }
 
 export class StartMcpAutocodingDto {
-  @ApiProperty({ enum: [1] })
-  @Equals(1)
-  auto_coder_run!: 1;
+  @ApiProperty({ enum: [1, 2] })
+  @IsIn([1, 2])
+  auto_coder_run!: 1 | 2;
+
+  @ApiPropertyOptional({ description: 'Approved finalization snapshot for run 2' })
+  @ValidateIf((object, value: unknown) => object.auto_coder_run === 2 || value !== undefined)
+  @IsDefined()
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  expected_source_revision?: string;
 
   @ApiPropertyOptional({ type: [String], description: 'Omit to process all considered persons of this workspace.' })
-  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @ValidateIf((object, value: unknown) => object.auto_coder_run === 2 || value !== undefined)
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)

@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import * as https from 'https';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { catchError, firstValueFrom } from 'rxjs';
+import { testcenterSourceSelection } from './testcenter-source-selection.util';
 import { Person, Response, Log } from '../shared';
 
 import { TestGroupsInfoDto } from '../../../../../../../api-dto/files/test-groups-info.dto';
@@ -787,6 +788,8 @@ export class TestcenterService {
           }
         );
 
+      const selectedNames = testcenterSourceSelection(Object.values(files).flat() as { name: string }[], (importOptions as ImportOptions & { sourceFileNames?: string[] }).sourceFileNames);
+      const selected = (file: { name: string }) => !selectedNames || selectedNames.has(file.name.toUpperCase());
       const {
         units, definitions, player, codings, testTakers, booklets, metadata
       } =
@@ -794,24 +797,24 @@ export class TestcenterService {
 
       const playerArr: File[] =
         player === 'true' ?
-          files.Resource.filter(f => f.name.includes('.html')) :
+          files.Resource.filter(f => selected(f) && f.name.includes('.html')) :
           [];
-      const unitsArr: File[] = units === 'true' ? files.Unit : [];
+      const unitsArr: File[] = units === 'true' ? files.Unit.filter(selected) : [];
       const definitionsArr: File[] =
         definitions === 'true' ?
-          files.Resource.filter(f => f.name.includes('.voud')) :
+          files.Resource.filter(f => selected(f) && f.name.includes('.voud')) :
           [];
       const codingsArr: File[] =
         codings === 'true' ?
-          files.Resource.filter(f => f.name.includes('.vocs')) :
+          files.Resource.filter(f => selected(f) && f.name.includes('.vocs')) :
           [];
       const bookletsArr: File[] =
-        booklets === 'true' ? (files.Booklet as unknown as File[]) : [];
+        booklets === 'true' ? (files.Booklet as unknown as File[]).filter(selected) : [];
       const testTakersArr: File[] =
-        testTakers === 'true' ? (files.Testtakers as unknown as File[]) : [];
+        testTakers === 'true' ? (files.Testtakers as unknown as File[]).filter(selected) : [];
       const metadataArr: File[] =
         metadata === 'true' ?
-          files.Resource.filter(f => f.name.includes('.vomd')) :
+          files.Resource.filter(f => selected(f) && f.name.includes('.vomd')) :
           [];
 
       const overwriteIdSet = new Set((overwriteFileIds || []).filter(Boolean));

@@ -220,8 +220,8 @@ export class CodingJobService {
     return this.status.resumeCodingJob(id, workspaceId, actorUserId);
   }
 
-  async submitCodingJob(id: number, workspaceId: number, actorUserId?: number): Promise<CodingJob> {
-    return this.status.submitCodingJob(id, workspaceId, actorUserId);
+  async submitCodingJob(id: number, workspaceId: number, actorUserId?: number, expectedRevision?: string): Promise<CodingJob> {
+    return this.status.submitCodingJob(id, workspaceId, actorUserId, expectedRevision);
   }
 
   async markCodingJobResultsApplied(

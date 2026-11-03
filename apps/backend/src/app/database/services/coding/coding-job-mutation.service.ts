@@ -9,6 +9,7 @@ import { assertCodingResourceCreation, assertCodingResourceMutation } from '../s
 import { JournalService } from '../shared/journal.service';
 import { isInitialCodingJobStatus } from './coding-job-status-policy';
 import { CodingJob } from '../../entities/coding-job.entity';
+import { assertManualJobRevision } from './manual-job-snapshot.util';
 import { CodingJobCoder } from '../../entities/coding-job-coder.entity';
 import { CodingJobVariable } from '../../entities/coding-job-variable.entity';
 import { CodingJobVariableBundle } from '../../entities/coding-job-variable-bundle.entity';
@@ -321,7 +322,8 @@ export class CodingJobMutationService {
     workspaceId: number,
     updateCodingJobDto: UpdateCodingJobDto,
     actorUserId?: number,
-    assignedCoderAction = false
+    assignedCoderAction = false,
+    expectedRevision?: string
   ): Promise<CodingJob> {
     return this.withLockedCodingJob(id, workspaceId, async (codingJob, manager) => {
       if (assignedCoderAction) {
@@ -332,6 +334,7 @@ export class CodingJobMutationService {
       } else {
         await assertCodingResourceMutation(manager, workspaceId, 'job', id, actorUserId);
       }
+      await assertManualJobRevision(codingJob, manager, expectedRevision);
       if (updateCodingJobDto.name !== undefined) {
         codingJob.name = updateCodingJobDto.name;
       }

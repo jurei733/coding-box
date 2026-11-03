@@ -160,6 +160,7 @@ import { UserModule } from '../user/user.module';
   ],
   exports: [
     McpManualCaseService,
+    CodingJobMutationService,
     CodingAggregationPeerService,
     CodingJobService,
     JobDefinitionService,

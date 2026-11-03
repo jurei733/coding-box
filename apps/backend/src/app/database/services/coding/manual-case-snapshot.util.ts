@@ -6,6 +6,7 @@ import { CodingJobUnit } from '../../entities/coding-job-unit.entity';
 import { ResponseEntity } from '../../entities/response.entity';
 import type { CodingJobSchemeService } from './coding-job-scheme.service';
 import { formatCodingTestPersonFromUnit } from './coding-progress-key.util';
+import { CODING_JOB_TYPE_CODING_ISSUE_REVIEW } from './coding-job-type.util';
 
 /** Read under the job mutation lock, shared by the preview and progress write. */
 export async function manualCaseSnapshot(
@@ -46,4 +47,22 @@ export async function manualCaseSnapshot(
   };
   const revision = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
   return { ...snapshot, revision };
+}
+
+export async function reviewCaseSnapshot(job: CodingJob, unit: CodingJobUnit, manager: EntityManager, schemes: CodingJobSchemeService, reviewerId: number) {
+  const source = await manualCaseSnapshot(job, unit, manager, schemes);
+  const reviewJob = await manager.getRepository(CodingJob).findOne({
+    where: { source_coding_job_id: job.id, reviewer_user_id: reviewerId, job_type: CODING_JOB_TYPE_CODING_ISSUE_REVIEW }
+  });
+  const decision = reviewJob ? await manager.getRepository(CodingJobUnit).findOne({ where: { coding_job_id: reviewJob.id, response_id: unit.response_id } }) : null;
+  const review = {
+    job_id: reviewJob?.id ?? null,
+    status: reviewJob?.status ?? null,
+    reviewer_id: reviewerId,
+    code: decision?.code ?? null,
+    score: decision?.score ?? null,
+    notes: decision?.notes ?? '',
+    is_open: decision?.is_open ?? false
+  };
+  return { ...source, review, revision: createHash('sha256').update(JSON.stringify({ source, review })).digest('hex') };
 }

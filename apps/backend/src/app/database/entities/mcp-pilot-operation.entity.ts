@@ -9,16 +9,17 @@ export type McpPilotStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'ne
 export type McpPilotImportPayload = {
   server_id: string;
   source_url: string;
+  source_file_names?: string[];
   tc_workspace_id: number;
   groups: string[];
   options: Record<string, boolean>;
   response_overwrite_mode: 'skip';
 };
-export type McpPilotCodingPayload = { auto_coder_run: 1; groups?: string[] };
+export type McpPilotCodingPayload = { auto_coder_run: 1 | 2; groups?: string[]; expected_source_revision?: string };
 export type McpPilotStatistics = {
   persons?: number; booklets?: number; units?: number; test_files?: number;
   import_tasks?: number; warning_count?: number; error_count?: number;
-  totalResponses?: number; statusCounts?: Record<string, number>; result_version?: 'v1';
+  totalResponses?: number; statusCounts?: Record<string, number>; result_version?: 'v1' | 'v3';
 };
 
 @Entity('mcp_pilot_operation')

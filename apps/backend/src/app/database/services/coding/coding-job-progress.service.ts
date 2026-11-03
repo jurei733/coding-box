@@ -5,7 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository, Connection, EntityManager, FindOneOptions
 } from 'typeorm';
-import { manualCaseSnapshot } from './manual-case-snapshot.util';
+import { manualCaseSnapshot, reviewCaseSnapshot } from './manual-case-snapshot.util';
 import { assertCodingResourceMutation } from '../shared/coding-ownership.policy';
 import { SaveCodingProgressDto } from '../../../admin/coding-job/dto/save-coding-progress.dto';
 import { SaveCodingNotesDto } from '../../../admin/coding-job/dto/save-coding-notes.dto';
@@ -414,6 +414,13 @@ export class CodingJobProgressService {
         true
       );
       this.query.assertCodingIssueReviewSourceUnit(sourceUnit);
+
+      if (progress.expectedRevision) {
+        const snapshot = await reviewCaseSnapshot(sourceCodingJob, sourceUnit, manager, this.scheme, reviewerUserId);
+        if (sourceCodingJob.freshness_status === 'stale_source' || snapshot.revision !== progress.expectedRevision) {
+          throw new ConflictException('Source case, rubric or supervisor decision changed; reload before reviewing');
+        }
+      }
 
       const selectedCode = await this.scheme.validateProgressSelectedCode(
         progress,

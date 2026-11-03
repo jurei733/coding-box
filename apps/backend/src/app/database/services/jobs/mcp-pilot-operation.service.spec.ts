@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { DataSource, FindOperator, Repository } from 'typeorm';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as finalization from '../coding/mcp-finalization-snapshot.util';
 import { McpPilotOperation } from '../../entities/mcp-pilot-operation.entity';
 import User from '../../entities/user.entity';
 import WorkspaceUser from '../../entities/workspace_user.entity';
@@ -95,6 +96,40 @@ function fixture() {
 }
 
 describe('MCP pilot operations', () => {
+  it('binds the exact source filenames to import idempotency and forwards them without changing overwrite rules', async () => {
+    const f = fixture(); const body = { ...f.body, source_file_names: ['G8.vomd', 'G8.xml'] };
+    const start = await f.service.startImport(17, 3, body, 'source-token');
+    await expect(f.service.startImport(17, 3, { ...body, source_file_names: ['OTHER.xml'] }, 'source-token')).rejects.toBeInstanceOf(ConflictException);
+    await f.service.execute(start.operation_id);
+    expect(f.testcenter.importWorkspaceFiles.mock.calls[0][5]).toMatchObject({ sourceFileNames: ['G8.vomd', 'G8.xml'] });
+    expect(f.testcenter.importWorkspaceFiles.mock.calls[0][10]).toBe('skip');
+    expect(f.queues.addMcpPilotJob).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['changed-source', 'incomplete-v3'])('never publishes v3 success from polling with %s', async problem => {
+    const f = fixture(); const revision = 'a'.repeat(64);
+    const start = await f.service.startCoding(17, 3, {
+      auto_coder_run: 2, groups: ['G8'], expected_source_revision: revision, request_key: 'finalize'
+    });
+    Object.assign(f.rows.get(start.operation_id)!, { status: 'running', external_job_id: 'child-1' });
+    const snapshot = jest.spyOn(finalization, 'readFinalizationSnapshot').mockResolvedValue({
+      workspace_id: 17,
+      group_ids: ['G8'],
+      revision: problem === 'changed-source' ? 'b'.repeat(64) : revision,
+      responses: 30,
+      final_responses: problem === 'incomplete-v3' ? 29 : 30,
+      eligible: true,
+      unresolved_manual_responses: 0,
+      pending_jobs: [],
+      result_version: 'v3'
+    });
+    try {
+      const status = await f.service.status(17, 3, start.operation_id, 'autocoding');
+      expect(status).toMatchObject({ status: 'needs_attention', error: { code: 'FINALIZATION_SOURCE_CHANGED_CHECK_V3' } });
+      expect(f.coding.codeTestPersons).not.toHaveBeenCalled();
+    } finally { snapshot.mockRestore(); }
+  });
+
   it('registers concurrent retries exactly once and does not put a source token into Bull', async () => {
     const f = fixture();
     const starts = await Promise.all([f.service.startImport(17, 3, f.body, 'secret-source-token'), f.service.startImport(17, 3, f.body, 'secret-source-token')]);

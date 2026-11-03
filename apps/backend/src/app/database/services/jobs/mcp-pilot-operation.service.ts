@@ -5,6 +5,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
 import { DataSource, In, Repository } from 'typeorm';
+import { normalizedTestcenterSourceNames } from '../test-results/testcenter-source-selection.util';
+import { readFinalizationSnapshot } from '../coding/mcp-finalization-snapshot.util';
 import {
   McpPilotKind, McpPilotOperation, McpPilotStatus, McpPilotStatistics,
   McpPilotImportPayload as ImportPayload, McpPilotCodingPayload as CodingPayload
@@ -89,6 +91,7 @@ export class McpPilotOperationService {
       throw new UnauthorizedException('X-IQB-Testcenter-Token header required.');
     }
     if (!Object.values(body.options).some(value => value === true)) throw new BadRequestException('Select at least one import option.');
+    if (body.source_file_names) normalizedTestcenterSourceNames(body.source_file_names);
     const source = this.config.source(body.server_id, body.tc_workspace_id);
     const payload: ImportPayload = {
       server_id: body.server_id,
@@ -96,6 +99,7 @@ export class McpPilotOperationService {
       tc_workspace_id: body.tc_workspace_id,
       groups: [...body.groups].sort(),
       options: { ...body.options },
+      ...(body.source_file_names ? { source_file_names: [...body.source_file_names].sort() } : {}),
       response_overwrite_mode: 'skip'
     };
     return this.register('testcenter-import', workspaceId, actorId, body.request_key, payload, token);
@@ -103,7 +107,7 @@ export class McpPilotOperationService {
 
   async startCoding(workspaceId: number, actorId: number, body: StartMcpAutocodingDto) {
     this.config.assertEnabled(); await this.assertAccess(actorId, workspaceId);
-    const payload: CodingPayload = { auto_coder_run: 1, ...(body.groups ? { groups: [...body.groups].sort() } : {}) };
+    const payload: CodingPayload = { auto_coder_run: body.auto_coder_run, ...(body.expected_source_revision ? { expected_source_revision: body.expected_source_revision } : {}), ...(body.groups ? { groups: [...body.groups].sort() } : {}) };
     return this.register('autocoding', workspaceId, actorId, body.request_key, payload);
   }
 
@@ -192,9 +196,18 @@ export class McpPilotOperationService {
     }
     const state = await child.getState();
     if (state === 'completed') {
+      // Both the worker and polling endpoint must verify the approved source.
+      // Otherwise a fast poll can expose success before the worker's final check.
+      const payload = operation.payload as CodingPayload;
+      if (payload.auto_coder_run === 2) {
+        const snapshot = await readFinalizationSnapshot(this.connection, operation.workspace_id, payload.groups!);
+        if (snapshot.revision !== payload.expected_source_revision || snapshot.final_responses !== snapshot.responses) {
+          await this.finish(operation, 'needs_attention', null, 'FINALIZATION_SOURCE_CHANGED_CHECK_V3'); return 0;
+        }
+      }
       const result = child.returnvalue as { totalResponses?: number; statusCounts?: Record<string, number> };
       await this.finish(operation, 'succeeded', {
-        totalResponses: result?.totalResponses ?? 0, statusCounts: result?.statusCounts ?? {}, result_version: 'v1'
+        totalResponses: result?.totalResponses ?? 0, statusCounts: result?.statusCounts ?? {}, result_version: (operation.payload as CodingPayload).auto_coder_run === 2 ? 'v3' : 'v1'
       });
     } else if (state === 'failed') {
       await this.finish(operation, 'needs_attention', null, 'CODING_FAILED_CHECK_TARGET');
@@ -258,6 +271,7 @@ export class McpPilotOperationService {
         // Delete the persisted credential before the first upstream request.
         await this.operations.update({ id }, { credential: null, credential_expires_at: null });
         const options = Object.fromEntries(Object.entries(payload.options).map(([key, value]) => [key, value ? 'true' : 'false'])) as unknown as ImportOptionsDto;
+        if (payload.source_file_names) (options as ImportOptionsDto & { sourceFileNames?: string[] }).sourceFileNames = payload.source_file_names;
         mutationsMayHaveStarted = true;
         const result = await withStrictTestcenterTransport(() => this.testcenter.importWorkspaceFiles(
           String(operation.workspace_id), String(payload.tc_workspace_id), payload.server_id, source.url, token, options, payload.groups.join(','), false, undefined, id, 'skip', operation.actor_id
@@ -271,15 +285,26 @@ export class McpPilotOperationService {
         });
         if (!people.length) { await this.finish(operation, 'failed', null, 'NO_CONSIDERED_PERSONS'); return; }
         await this.queues.assertNoDependencyConflicts('test-person-coding', operation.workspace_id);
-        await this.codingGuard.assertAutoCodingRunCanStart(operation.workspace_id, 1);
+        if (payload.auto_coder_run === 2) {
+          if (!payload.groups?.length || !payload.expected_source_revision) throw new Error('Explicit groups and approved source revision required');
+          const snapshot = await readFinalizationSnapshot(this.connection, operation.workspace_id, payload.groups);
+          if (!snapshot.eligible || snapshot.revision !== payload.expected_source_revision) throw new Error('Finalization source changed or manual cases remain unresolved');
+        }
+        await this.codingGuard.assertAutoCodingRunCanStart(operation.workspace_id, payload.auto_coder_run);
         mutationsMayHaveStarted = true;
-        const result = await this.coding.codeTestPersons(operation.workspace_id, people.map(person => String(person.id)).join(','), 1);
+        const result = await this.coding.codeTestPersons(operation.workspace_id, people.map(person => String(person.id)).join(','), payload.auto_coder_run);
         if (!result.jobId) { await this.finish(operation, 'needs_attention', null, 'CODING_JOB_NOT_REGISTERED'); return; }
         await this.operations.update({ id }, { external_job_id: result.jobId });
         operation.external_job_id = result.jobId;
         const child = await this.queues.getTestPersonCodingJob(result.jobId);
         if (!child) { await this.finish(operation, 'needs_attention', null, 'CODING_JOB_UNAVAILABLE'); return; }
         await child.finished();
+        if (payload.auto_coder_run === 2) {
+          const snapshot = await readFinalizationSnapshot(this.connection, operation.workspace_id, payload.groups!);
+          if (snapshot.revision !== payload.expected_source_revision || snapshot.final_responses !== snapshot.responses) {
+            await this.finish(operation, 'needs_attention', null, 'FINALIZATION_SOURCE_CHANGED_CHECK_V3'); return;
+          }
+        }
         await this.syncCoding(operation);
       }
     } catch {

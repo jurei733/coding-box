@@ -23,8 +23,8 @@ export class CodingJobStatusService {
     return this.setOwnCodingJobStatus(id, workspaceId, 'active', actorUserId);
   }
 
-  async submitCodingJob(id: number, workspaceId: number, actorUserId?: number): Promise<CodingJob> {
-    return this.mutation.updateCodingJob(id, workspaceId, { status: 'completed' }, actorUserId, true);
+  async submitCodingJob(id: number, workspaceId: number, actorUserId?: number, expectedRevision?: string): Promise<CodingJob> {
+    return this.mutation.updateCodingJob(id, workspaceId, { status: 'completed' }, actorUserId, true, expectedRevision);
   }
 
   private async setOwnCodingJobStatus(

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WorkspaceMcpManualController } from '../workspace/workspace-mcp-manual.controller';
+import { WorkspaceMcpManualAdminController } from '../workspace/workspace-mcp-manual-admin.controller';
 import { WorkspaceSettingsModule } from '../../workspace/workspace-settings.module';
 import { DatabaseModule } from '../../database/database.module';
 import { CodingModule } from '../../coding/coding.module';
@@ -42,6 +43,7 @@ import { DistributionPreviewLimiterService } from './distribution-preview-limite
   ],
   controllers: [
     WorkspaceMcpManualController,
+    WorkspaceMcpManualAdminController,
     WorkspaceMcpPilotController,
     WorkspaceCodingController,
     WorkspaceCodingExportController,
