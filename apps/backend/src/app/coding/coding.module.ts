@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { McpManualCaseService } from '../database/services/coding/mcp-manual-case.service';
 import { CodingJobAccessService } from '../database/services/coding/coding-job-access.service';
 import { CodingJobAggregationService } from '../database/services/coding/coding-job-aggregation.service';
 import { CodingJobDistributionService } from '../database/services/coding/coding-job-distribution.service';
@@ -106,6 +107,7 @@ import { UserModule } from '../user/user.module';
     UserModule
   ],
   providers: [
+    McpManualCaseService,
     CodingJobAccessService,
     CodingJobAggregationService,
     CodingJobDistributionService,
@@ -157,6 +159,7 @@ import { UserModule } from '../user/user.module';
     }
   ],
   exports: [
+    McpManualCaseService,
     CodingAggregationPeerService,
     CodingJobService,
     JobDefinitionService,

@@ -1,8 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException, ConflictException, Injectable, NotFoundException
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository, Connection, EntityManager, FindOneOptions
 } from 'typeorm';
+import { manualCaseSnapshot } from './manual-case-snapshot.util';
 import { assertCodingResourceMutation } from '../shared/coding-ownership.policy';
 import { SaveCodingProgressDto } from '../../../admin/coding-job/dto/save-coding-progress.dto';
 import { SaveCodingNotesDto } from '../../../admin/coding-job/dto/save-coding-notes.dto';
@@ -54,6 +57,16 @@ export class CodingJobProgressService {
         manager,
         true
       );
+
+      if (progress.expectedRevision) {
+        if (codingJob.freshness_status === 'stale_source') {
+          throw new ConflictException('Manual coding job has stale source data; refresh the job before saving');
+        }
+        const snapshot = await manualCaseSnapshot(codingJob, codingJobUnit, manager, this.scheme);
+        if (snapshot.revision !== progress.expectedRevision) {
+          throw new ConflictException('Manual case, source answer or rubric changed; reload before saving');
+        }
+      }
 
       const selectedCode = await this.scheme.validateProgressSelectedCode(
         progress,

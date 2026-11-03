@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
+  Matches,
   IsObject,
   IsOptional,
   IsBoolean,
@@ -14,6 +15,12 @@ import { SaveCodingProgressSelectedCodeDto } from './save-coding-progress-select
  * DTO for saving partial coding progress
  */
 export class SaveCodingProgressDto {
+  @ApiProperty({ description: 'Optional atomic revision from the MCP manual-case endpoint', required: false })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  expectedRevision?: string;
+
   @ApiProperty({
     description: 'Test person identifier (login@code@bookletId or login@code@group@bookletId)',
     example: 'testuser@123@g1@testbooklet'
