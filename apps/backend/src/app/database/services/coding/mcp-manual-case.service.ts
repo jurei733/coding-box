@@ -14,7 +14,7 @@ export class McpManualCaseService {
   ) {}
 
   async get(workspaceId: number, jobId: number, responseId: number, actorId: number) {
-    return this.mutation.withLockedCodingJobById(jobId, async (job, manager) => {
+    return this.mutation.withLockedCodingJob(jobId, workspaceId, async (job, manager) => {
       if (job.workspace_id !== workspaceId) throw new NotFoundException('Coding job not found');
       await this.access.assertAssignedCoderAccess(jobId, workspaceId, actorId, manager);
       const units = await manager.getRepository(CodingJobUnit).find({

@@ -34,7 +34,10 @@ describe('MCP manual case and atomic progress', () => {
     const repository = { find: jest.fn().mockResolvedValue([unit]), save: jest.fn().mockResolvedValue(unit) };
     const manager = { getRepository: jest.fn(entity => (entity === ResponseEntity ? { findOne: jest.fn().mockImplementation(async () => response) } : repository)) };
     const access = { assertAssignedCoderAccess: jest.fn().mockResolvedValue(undefined) };
-    const mutation = { withLockedCodingJobById: jest.fn(async (_id, callback) => callback(job, manager)) };
+    const mutation = {
+      withLockedCodingJobById: jest.fn(async (_id, callback) => callback(job, manager)),
+      withLockedCodingJob: jest.fn(async (_id, _workspace, callback) => callback(job, manager))
+    };
     const schemes = {
       getCodingSchemesForUnits: jest.fn().mockImplementation(async () => new Map([[unit, {}]])),
       findVariableCoding: jest.fn().mockImplementation(() => rubric),
@@ -52,7 +55,7 @@ describe('MCP manual case and atomic progress', () => {
   it('returns the original answer and rubric under the assigned-coder job lock', async () => {
     const c = setup();
     const result = await c.service.get(12, 3, 18, 8);
-    expect(c.mutation.withLockedCodingJobById).toHaveBeenCalledWith(3, expect.any(Function));
+    expect(c.mutation.withLockedCodingJob).toHaveBeenCalledWith(3, 12, expect.any(Function));
     expect(c.access.assertAssignedCoderAccess).toHaveBeenCalledWith(3, 12, 8, c.manager);
     expect(result).toMatchObject({
       response_id: 18, test_person: 'pilot@p1@G8@B1', value: c.response.value, rubric: c.rubric
