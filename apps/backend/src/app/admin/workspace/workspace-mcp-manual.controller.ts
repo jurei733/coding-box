@@ -31,7 +31,7 @@ export class WorkspaceMcpManualController {
   async submit(@Param('workspace_id', ParseIntPipe) workspace: number, @Param('job_id', ParseIntPipe) job: number,
     @Req() request: { user: { id: number } }, @Body(new ValidationPipe({ whitelist: true, transform: true })) body: McpManualJobDto) {
     const state = await this.cases.state(workspace, job, request.user.id);
-    await this.mutation.updateCodingJob(job, workspace, { status: state.requires_review ? 'review' : 'completed' }, request.user.id, true, body.expectedRevision);
+    await this.mutation.updateCodingJob(job, workspace, { status: (state.requires_review || body.reviewRequested) ? 'review' : 'completed' }, request.user.id, true, body.expectedRevision);
     return this.cases.state(workspace, job, request.user.id);
   }
 

@@ -280,7 +280,7 @@ describe('WorkspaceCoderTrainingController', () => {
     expect(result.version).toBe('fresh-1');
   });
 
-  it('forwards discussion result notes to the service', async () => {
+  it.each([undefined, 999])('forwards discussion notes and code; client score %s is never a source of points', async clientScore => {
     coderTrainingService.saveDiscussionResult.mockResolvedValue({
       success: true,
       code: 7,
@@ -295,7 +295,7 @@ describe('WorkspaceCoderTrainingController', () => {
       12,
       5,
       {
-        responseId: 101, code: 7, score: 2, notes: 'Replay note'
+        responseId: 101, code: 7, ...(clientScore === undefined ? {} : { score: clientScore }), notes: 'Replay note'
       },
       { user: { id: 23, username: 'manager' } } as never
     );

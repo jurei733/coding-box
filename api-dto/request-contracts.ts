@@ -349,7 +349,7 @@ export const requestBodySchemas = {
     code: either({ type: 'null' }, number),
     score: either({ type: 'null' }, number),
     notes: either({ type: 'null' }, string)
-  }, ['responseId', 'code', 'score']),
+  }, ['responseId', 'code']),
   TrainingDiscussionApplySource: trainingDiscussionApplySource,
   TrainingDiscussionApplyPreviewRequest: object({ source: trainingDiscussionApplySource }, ['source']),
   ApplyTrainingDiscussionResultsRequestDto: object({

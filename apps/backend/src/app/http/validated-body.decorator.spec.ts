@@ -12,6 +12,7 @@ describe('Generated OpenAPI request contracts', () => {
     ['WorkspaceCoderTrainingController_saveDiscussionResult', {
       responseId: 1, code: null, score: null, notes: null
     }, true],
+    ['WorkspaceCoderTrainingController_saveDiscussionResult', { responseId: 1, code: 0, notes: 'Native rubric determines score' }, true],
     ['WorkspaceCoderTrainingController_saveDiscussionResult', { responseId: 1, code: '1', score: null }, false],
     ['TrainingDiscussionApplyPreviewRequest', { source: 'auto_agreement' }, true],
     ['TrainingDiscussionApplyPreviewRequest', { source: 'unknown' }, false],
