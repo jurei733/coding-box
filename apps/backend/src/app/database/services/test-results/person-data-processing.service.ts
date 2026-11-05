@@ -405,12 +405,22 @@ export class PersonDataProcessingService {
     loadTime: number
   } | null {
     try {
-      const keyValues = logEntry.slice(1, -1).split(',');
-      const parsedResult: { [key: string]: string | number | undefined } = {};
-      keyValues.forEach(pair => {
-        const [key, value] = pair.split(':', 2).map(part => part.trim().replace(/\\/g, ''));
-        parsedResult[key] = !Number.isNaN(Number(value)) ? Number(value) : value || undefined;
-      });
+      let parsedResult: { [key: string]: unknown } | undefined;
+      try {
+        const value: unknown = JSON.parse(logEntry);
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          parsedResult = value as { [key: string]: unknown };
+        }
+      } catch {
+        // Older Testcenter versions wrote unquoted object-like parameters.
+      }
+      if (!parsedResult) {
+        parsedResult = Object.create(null) as { [key: string]: unknown };
+        logEntry.slice(1, -1).split(',').forEach(pair => {
+          const [key, value] = pair.split(':', 2).map(part => part.trim().replace(/\\/g, ''));
+          parsedResult[key] = !Number.isNaN(Number(value)) ? Number(value) : value || undefined;
+        });
+      }
 
       return {
         browserVersion: parsedResult.browserVersion?.toString() || 'Unknown',
