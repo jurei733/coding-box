@@ -229,17 +229,35 @@ export class WorkspacePlayerService {
   }
 
   async findTestPersonUnits(id: number, testPerson: string): Promise<ResponseEntity[]> {
-    this.logger.log('Returning all unit Ids for testperson ', testPerson);
-    const res = this.responseRepository
-      .find({
-        select: ['unitid'],
-        // where: { testPerson: testPerson },
-        order: { unitid: 'ASC' }
-      });
-    if (res) {
-      return res;
+    if (!Number.isSafeInteger(id) || id <= 0 || !testPerson?.trim()) {
+      return [];
     }
-    return [];
+    this.logger.log('Returning all unit Ids for testperson ', testPerson);
+    const reference = this.parseReplayTestPerson(testPerson);
+    const personWhere: Partial<Persons> = {
+      workspace_id: id,
+      login: reference?.login ?? testPerson,
+      consider: true
+    };
+    if (reference) {
+      personWhere.code = reference.code;
+      if (reference.group !== undefined) personWhere.group = reference.group;
+    }
+
+    return this.responseRepository.find({
+      select: ['unitid'],
+      where: {
+        unit: {
+          booklet: {
+            person: personWhere,
+            ...(reference?.bookletName ? {
+              bookletinfo: { name: In([reference.bookletName, reference.bookletName.toUpperCase()]) }
+            } : {})
+          }
+        }
+      },
+      order: { unitid: 'ASC' }
+    });
   }
 
   async getBookletUnits(

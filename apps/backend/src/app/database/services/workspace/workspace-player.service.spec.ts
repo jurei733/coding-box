@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { WorkspacePlayerService } from './workspace-player.service';
 import FileUpload from '../../entities/file_upload.entity';
@@ -794,11 +795,37 @@ describe('WorkspacePlayerService', () => {
 
       const result = await service.findTestPersonUnits(5, 'PERSON1');
 
-      expect(mockRepository.find).toHaveBeenCalledWith({
-        select: ['unitid'],
-        order: { unitid: 'ASC' }
-      });
+      expect(mockRepository.find).toHaveBeenCalledWith(expect.objectContaining({
+        where: { unit: { booklet: { person: { workspace_id: 5, login: 'PERSON1', consider: true } } } }
+      }));
       expect(result).toEqual(mockResponses);
+    });
+
+    it('should keep replay login, code, group, booklet and workspace constraints together', async () => {
+      mockRepository.find.mockResolvedValue([{ unitid: 42 }]);
+
+      expect(await service.findTestPersonUnits(5, 'login@@group-a@BOOKLET_A')).toEqual([{ unitid: 42 }]);
+      const options = mockRepository.find.mock.calls[0][0];
+      expect(options.where.unit.booklet.person).toEqual({
+        workspace_id: 5, login: 'login', code: '', group: 'group-a', consider: true
+      });
+      expect(options.where.unit.booklet.bookletinfo.name).toEqual(In(['BOOKLET_A', 'BOOKLET_A']));
+    });
+
+    it('should support legacy replay references without widening to other logins or codes', async () => {
+      mockRepository.find.mockResolvedValue([]);
+
+      expect(await service.findTestPersonUnits(5, 'login@code@BOOKLET_A')).toEqual([]);
+      expect(mockRepository.find.mock.calls[0][0].where.unit.booklet.person).toEqual({
+        workspace_id: 5, login: 'login', code: 'code', consider: true
+      });
+    });
+
+    it('should never fall back to an unfiltered query for missing selections', async () => {
+      expect(await service.findTestPersonUnits(5, '')).toEqual([]);
+      expect(await service.findTestPersonUnits(5, ' ')).toEqual([]);
+      expect(await service.findTestPersonUnits(0, 'PERSON1')).toEqual([]);
+      expect(mockRepository.find).not.toHaveBeenCalled();
     });
 
     it('should return empty array when no responses found', async () => {
