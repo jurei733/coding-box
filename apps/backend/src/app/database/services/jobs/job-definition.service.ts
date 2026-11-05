@@ -1026,12 +1026,6 @@ export class JobDefinitionService {
       const creatorUserId = await assertCodingResourceCreation(transactionManager, workspaceId, actorUserId);
       const coderAssignments = this.resolveCoderAssignments(createDto);
       const distributionSeed = createDto.distributionSeed || this.createDistributionSeed(workspaceId);
-      const missingsProfileId = await this.missingsProfilesService.resolveMissingsProfileId(
-        workspaceId,
-        createDto.missingsProfileId,
-        transactionManager
-      );
-
       await this.codingJobService.assertDeriveErrorManualCodingEnabled(
         workspaceId,
         {
@@ -1074,6 +1068,15 @@ export class JobDefinitionService {
           `The following variables have no remaining cases for this job definition: ${conflicts.join(', ')}`
         );
       }
+
+      // Planning may initialize the workspace's default profile on another
+      // connection. Do not hold an uncommitted insert of that unique profile
+      // while awaiting the planner, or the first definition waits on itself.
+      const missingsProfileId = await this.missingsProfilesService.resolveMissingsProfileId(
+        workspaceId,
+        createDto.missingsProfileId,
+        transactionManager
+      );
 
       const jobDefinition = repository.create({
         workspace_id: workspaceId,

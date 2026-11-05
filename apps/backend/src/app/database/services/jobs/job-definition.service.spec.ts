@@ -347,6 +347,30 @@ describe('JobDefinitionService', () => {
     ]));
   });
 
+  it('does not hold the first default profile insert while planning on another connection', async () => {
+    let profileInsertIsUncommitted = false;
+    const planUsage = codingJobService.calculateDistributionVariableUsageByStatusBatch.getMockImplementation();
+    missingsProfilesService.resolveMissingsProfileId.mockImplementation(async () => {
+      profileInsertIsUncommitted = true;
+      return 55;
+    });
+    codingJobService.calculateDistributionVariableUsageByStatusBatch.mockImplementation(async (...args) => {
+      // Native planning initializes the same unique default profile using its
+      // own repository. An earlier insert in the outer transaction self-blocks.
+      expect(profileInsertIsUncommitted).toBe(false);
+      return planUsage(...args);
+    });
+
+    const result = await service.createJobDefinition({
+      name: 'First definition',
+      assignedVariables: [{ unitName: 'Unit 1', variableId: 'Var 1' }],
+      assignedCoders: [1]
+    }, 7);
+
+    expect(result.missings_profile_id).toBe(55);
+    expect(profileInsertIsUncommitted).toBe(true);
+  });
+
   it('persists the user-facing name and optional description', async () => {
     await expect(service.createJobDefinition({
       name: 'Lesen Klasse 4',
