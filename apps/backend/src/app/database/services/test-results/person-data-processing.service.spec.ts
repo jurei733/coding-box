@@ -519,6 +519,13 @@ describe('PersonDataProcessingService', () => {
   });
 
   describe('parseLoadCompleteLog', () => {
+    it('preserves JSON session strings containing commas, colons, quotes and backslashes', () => {
+      const values = {
+        browserName: 'QA, Browser: "quoted"', browserVersion: '001', osName: 'OS: test, edition', device: 'Tablet', screenSizeWidth: 1440, screenSizeHeight: 900, loadTime: 37
+      };
+      expect(service.parseLoadCompleteLog(JSON.stringify(values))).toEqual(values);
+    });
+
     it('should parse valid LOADCOMPLETE log', () => {
       const log =
         '{browserVersion:128,browserName:Firefox,osName:Linux,device:Desktop,screenSizeWidth:1920,screenSizeHeight:1080,loadTime:500}';

@@ -156,6 +156,34 @@ describe('PersonPersistenceService', () => {
     expect(bookletLogRepository.save).toHaveBeenCalled();
   });
 
+  it('counts LOADCOMPLETE sessions in saved import records and skips them on duplicate reimport', async () => {
+    const person: Person = {
+      group: 'g',
+      login: 'l',
+      code: 'c',
+      workspace_id: 1,
+      booklets: [{
+        id: 'B',
+        logs: [],
+        units: [],
+        sessions: [{
+          browser: 'QA 1', os: 'Test', screen: '1440 x 900', ts: '123', loadCompleteMS: 37
+        }]
+      }]
+    };
+    jest.spyOn(personsRepository, 'find').mockResolvedValue([{ id: 10, ...person }] as unknown as Persons[]);
+    jest.spyOn(personsRepository, 'findOne').mockResolvedValue({ id: 10, ...person } as unknown as Persons);
+    jest.spyOn(bookletInfoRepository, 'findOne').mockResolvedValue({ id: 20, name: 'B' } as BookletInfo);
+    jest.spyOn(bookletRepository, 'findOne').mockResolvedValue({ id: 30 } as Booklet);
+    jest.spyOn(bookletSessionRepository, 'find').mockResolvedValue([]);
+    jest.spyOn(bookletSessionRepository, 'save').mockResolvedValue([] as never);
+    expect(await service.processPersonLogs([person], [], [], false)).toMatchObject({ success: true, totalLogsSaved: 1, totalLogsSkipped: 0 });
+    jest.spyOn(bookletSessionRepository, 'find').mockResolvedValue([{
+      browser: 'QA 1', os: 'Test', screen: '1440 x 900', ts: 123, loadcompletems: 37
+    }] as Session[]);
+    expect(await service.processPersonLogs([person], [], [], false)).toMatchObject({ success: true, totalLogsSaved: 0, totalLogsSkipped: 1 });
+  });
+
   it('should replace existing sessions when overwriting booklet logs', async () => {
     jest.spyOn(bookletSessionRepository, 'delete').mockResolvedValue({} as never);
     jest.spyOn(bookletSessionRepository, 'save').mockResolvedValue([] as never);

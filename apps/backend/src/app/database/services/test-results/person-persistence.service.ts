@@ -988,7 +988,11 @@ export class PersonPersistenceService {
               issues.push({ level: 'error', category: 'other', message: `Logs für Testheft ${booklet.id} konnten nicht gespeichert werden.` });
             }
 
-            await this.storeBookletSessions(booklet, existingBooklet, overwriteExistingLogs);
+            // LOADCOMPLETE input rows are stored as sessions, not booklet logs.
+            // Include both in the import receipt so row counts remain comparable.
+            const savedSessions = await this.storeBookletSessions(booklet, existingBooklet, overwriteExistingLogs);
+            totalLogsSaved += savedSessions;
+            totalLogsSkipped += (booklet.sessions?.length || 0) - savedSessions;
             const unitLogsResult = await this.processUnits(booklet, existingBooklet, originalPerson, overwriteExistingLogs, issues);
             totalLogsSaved += unitLogsResult.saved;
             totalLogsSkipped += unitLogsResult.skipped;
@@ -1093,9 +1097,9 @@ export class PersonPersistenceService {
     booklet: TcMergeBooklet,
     existingBooklet: Booklet,
     overwriteExisting: boolean = true
-  ): Promise<void> {
+  ): Promise<number> {
     if (!booklet.sessions || booklet.sessions.length === 0) {
-      return;
+      return 0;
     }
 
     let sessionEntries = booklet.sessions.map(session => ({
@@ -1143,13 +1147,14 @@ export class PersonPersistenceService {
 
       if (sessionEntries.length === 0) {
         this.logger.log(`Skipped duplicate sessions for booklet ${booklet.id}`);
-        return;
+        return 0;
       }
 
       await this.bookletSessionRepository.save(sessionEntries);
       this.logger.log(
         `Saved ${sessionEntries.length} sessions for booklet ${booklet.id}`
       );
+      return sessionEntries.length;
     } catch (error) {
       this.logger.error(
         `Failed to save sessions for booklet ${booklet.id}: ${error.message}`
