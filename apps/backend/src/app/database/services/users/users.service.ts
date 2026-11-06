@@ -438,20 +438,25 @@ export class UsersService {
   }
 
   async removeIds(ids: number[], currentUserId: number): Promise<void> {
-    if (!ids || ids.length === 0) {
+    if (!Array.isArray(ids) || ids.length === 0) {
       throw new BadRequestException('No user IDs were provided for deletion.');
     }
 
-    if (ids.includes(currentUserId)) {
+    const normalizedIds = Array.from(new Set(ids.map(id => Number(id))));
+    if (normalizedIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+      throw new BadRequestException('User IDs must be positive safe integers.');
+    }
+
+    if (normalizedIds.includes(Number(currentUserId))) {
       throw new ForbiddenException('A user cannot delete themselves.');
     }
 
     const totalUsers = await this.usersRepository.count();
-    if (ids.length >= totalUsers) {
+    if (normalizedIds.length >= totalUsers) {
       throw new ForbiddenException('All users cannot be deleted at once.');
     }
 
-    await this.deleteUsersWithStudyManagerInvariant(ids);
+    await this.deleteUsersWithStudyManagerInvariant(normalizedIds);
   }
 
   private async deleteUsersWithStudyManagerInvariant(userIds: number[]): Promise<void> {
