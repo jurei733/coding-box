@@ -394,6 +394,31 @@ describe('UsersService', () => {
     await expect(service.removeIds([2], 1)).resolves.toBeUndefined();
   });
 
+  it('compares numeric user identifiers before enforcing self-deletion protection', async () => {
+    await expect(service.removeIds(['4'] as never, 4)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(usersRepository.count).not.toHaveBeenCalled();
+    expect(usersRepository.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes the selected users rather than individual characters in a scalar identifier', async () => {
+    await expect(service.removeIds('17' as never, 4)).rejects.toBeInstanceOf(BadRequestException);
+    expect(usersRepository.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([[0], [-1], [17.5], [Number.POSITIVE_INFINITY], [Number.NaN], ['17x'], ['']])(
+    'rejects invalid user identifiers before persistence: %j', async (...ids) => {
+      await expect(service.removeIds(ids as never, 4)).rejects.toBeInstanceOf(BadRequestException);
+      expect(usersRepository.count).not.toHaveBeenCalled();
+      expect(usersRepository.delete).not.toHaveBeenCalled();
+    }
+  );
+
+  it('normalizes and deduplicates selected IDs before counting users or deleting', async () => {
+    usersRepository.count.mockResolvedValueOnce(2);
+    await expect(service.removeIds(['17', '17'] as never, 4)).resolves.toBeUndefined();
+    expect(usersRepository.delete).toHaveBeenCalledWith([17]);
+  });
+
   it('reports success when removing all workspace assignments', async () => {
     workspaceUserRepository.find.mockResolvedValueOnce([{
       userId: 1,

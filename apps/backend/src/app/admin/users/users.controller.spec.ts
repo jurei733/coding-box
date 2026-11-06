@@ -13,6 +13,7 @@ describe('UsersController', () => {
 
   beforeEach(async () => {
     usersService = createMock<UsersService>();
+    usersService.removeIds.mockResolvedValue(undefined);
     authService = createMock<AuthService>();
     // 1 = nonmember, 2 = coder, 3 = study manager of workspace 3, 4 = admin.
     authService.isAdminUser.mockImplementation(userId => Promise.resolve(userId === 4));
@@ -77,6 +78,34 @@ describe('UsersController', () => {
     await app.listen(0);
     return app;
   }
+
+  describe('user deletion HTTP identifiers', () => {
+    it.each([
+      { route: '?id=17', ids: [17] },
+      { route: '?id=17&id=18', ids: [17, 18] },
+      { route: '/17;18', ids: [17, 18] }
+    ])('passes complete numeric identifiers from $route to the deletion service', async ({ route, ids }) => {
+      const app = await createTestApp();
+      try {
+        const response = await fetch(`${await app.getUrl()}/admin/users${route}`, { method: 'DELETE' });
+        expect(response.status).toBe(200);
+        expect(usersService.removeIds).toHaveBeenCalledWith(ids, 4);
+      } finally {
+        await app.close();
+      }
+    });
+
+    it.each(['?id=17x', '/17x', ''])('rejects missing or malformed identifiers before deletion: %s', async route => {
+      const app = await createTestApp();
+      try {
+        const response = await fetch(`${await app.getUrl()}/admin/users${route}`, { method: 'DELETE' });
+        expect(response.status).toBe(400);
+        expect(usersService.removeIds).not.toHaveBeenCalled();
+      } finally {
+        await app.close();
+      }
+    });
+  });
 
   describe('workspace access', () => {
     it('parses the workspace id when retrieving user access', async () => {
