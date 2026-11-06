@@ -2366,7 +2366,7 @@ ${bookletRefs}
     }
   }
 
-  async getUnitContent(workspaceId: number, unitId: number): Promise<string> {
+  async getUnitContent(workspaceId: number, unitId: string): Promise<string> {
     const unitFile = await this.fileUploadRepository.findOne({
       where: { workspace_id: workspaceId, file_id: `${unitId}` }
     });
