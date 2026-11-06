@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
-  EntityManager, FindOperator, In, Like, QueryRunner, Repository
+  EntityManager, FindOperator, ILike, In, Like, QueryRunner, Repository
 } from 'typeorm';
 import * as cheerio from 'cheerio';
 import AdmZip = require('adm-zip');
@@ -1170,7 +1170,7 @@ ${bookletRefs}
         where: {
           workspace_id: workspaceId,
           file_type: 'Resource',
-          filename: Like('%.vomd')
+          filename: ILike('%.vomd')
         }
       });
 
