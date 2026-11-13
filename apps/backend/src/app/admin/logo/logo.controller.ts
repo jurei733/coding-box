@@ -18,7 +18,7 @@ export class LogoController {
   constructor(private readonly logoService: LogoService) {}
 
   @Post('upload')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Upload logo', description: 'Uploads a new logo to replace the default one' })
   @UseInterceptors(LogoUploadInterceptor)
