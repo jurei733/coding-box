@@ -2,6 +2,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Req,
@@ -172,15 +173,19 @@ export class CodingJobsController {
   ): Promise<{ data: CodingJobDto[] }> {
     await this.assertCanQueryCoderJobs(coderId, req);
     const codingJobs = await this.codingJobService.getCodingJobsByCoder(coderId);
-    await Promise.all(
-      codingJobs.map(job => this.assertCanAccessDirectCodingJob(
-        job.id,
-        job.workspace_id,
-        req
-      ))
-    );
+    const accessibleJobs = await Promise.all(codingJobs.map(async job => {
+      try {
+        await this.assertCanAccessDirectCodingJob(job.id, job.workspace_id, req);
+        return job;
+      } catch (error) {
+        // A stale assignment must not hide the user's remaining accessible jobs.
+        // Direct lookups retain their denial and operational failures propagate.
+        if (error instanceof ForbiddenException || error instanceof NotFoundException) return null;
+        throw error;
+      }
+    }));
     return {
-      data: codingJobs.map(job => CodingJobDto.fromEntity(job))
+      data: accessibleJobs.filter(job => job !== null).map(job => CodingJobDto.fromEntity(job))
     };
   }
 

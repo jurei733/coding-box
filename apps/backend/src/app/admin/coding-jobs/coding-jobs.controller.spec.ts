@@ -1,4 +1,6 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException, NotFoundException, UnauthorizedException
+} from '@nestjs/common';
 import { Request } from 'express';
 import { CodingJobsController } from './coding-jobs.controller';
 
@@ -107,6 +109,37 @@ describe('CodingJobsController', () => {
 
     expect(usersService.getUserIsAdmin).toHaveBeenCalledWith(42);
     expect(codingJobService.getCodingJobsByCoder).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    new NotFoundException('Workspace or job was deleted'),
+    new ForbiddenException('Workspace access was revoked')
+  ])('keeps accessible own jobs when another assignment is stale: %s', async error => {
+    codingJobService.assertUserCanAccessCodingJob.mockImplementation(async id => {
+      if (id === 7) throw error;
+    });
+
+    const result = await controller.getCodingJobsByCoder(42, requestWithUser({ id: 42 }));
+
+    expect(result.data.map(job => job.id)).toEqual([8]);
+    await expect(controller.getCodingJobById(7, requestWithUser({ id: 42 })))
+      .rejects.toBe(error);
+  });
+
+  it('returns an empty own list when all assignments are no longer accessible', async () => {
+    codingJobService.assertUserCanAccessCodingJob.mockRejectedValue(new ForbiddenException());
+
+    const result = await controller.getCodingJobsByCoder(42, requestWithUser({ id: 42 }));
+
+    expect(result.data).toEqual([]);
+  });
+
+  it('propagates backend failures instead of hiding them as an empty job list', async () => {
+    const failure = new Error('Database unavailable');
+    codingJobService.assertUserCanAccessCodingJob.mockRejectedValue(failure);
+
+    await expect(controller.getCodingJobsByCoder(42, requestWithUser({ id: 42 })))
+      .rejects.toBe(failure);
   });
 
   it('allows system admins to query direct coder-job lists for other users', async () => {
